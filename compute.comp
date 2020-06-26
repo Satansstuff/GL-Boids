@@ -1,0 +1,52 @@
+#version 430
+#define NUM_BOIDS 48
+#define SEP_DIST 10.0
+#define SPEEDLIMIT 0.5
+layout(local_size_x = NUM_BOIDS) in;
+
+layout (std430, binding = 0) buffer ip
+{ 
+    vec2 position[];
+};
+layout (std430, binding = 1) buffer iv
+{ 
+    vec2 velocity[];
+};
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    vec2 pos = position[index];
+    vec2 vel = velocity[index];
+    // Separation
+    vec2 sep;
+    for(uint i = 0; i < NUM_BOIDS; i++)
+    {
+        float d = distance(pos, position[i]);
+        if(i != index && d < SEP_DIST)
+        {
+            sep += normalize(pos - position[i]) * (SEP_DIST - d);  
+        }
+    }
+    //Flock-center and speed-match
+    vec2 centerofmass;
+    vec2 flockspeed;
+    for(uint i = index + 1; i < index + 8; i++)
+    {
+        centerofmass += position[i];
+        flockspeed += velocity[i];
+    }
+    flockspeed += velocity[index];
+    centerofmass /= 7.0;
+    flockspeed /= 7.0;
+    vec2 dircentermass = (centerofmass - pos) / 10.0;
+    vec2 velcontrol = (flockspeed - vel) / 10.0;
+    velocity[index] += dircentermass;
+    velocity[index] += sep * 0.1;
+    velocity[index] += velcontrol;
+    if(length(velocity[index]) > SPEEDLIMIT)
+    {
+        velocity[index] = normalize(velocity[index]) * SPEEDLIMIT;
+    }
+    position[index] += velocity[index];
+}
