@@ -9,7 +9,9 @@
 #include <fstream>
 #include <streambuf>
 #include <random>
+#include <unordered_map>
 #define num_boids 48
+
 std::string loadtext(std::string in)
 {
     std::ifstream t(in);
@@ -22,6 +24,26 @@ std::string loadtext(std::string in)
     str.assign((std::istreambuf_iterator<char>(t)),
                 std::istreambuf_iterator<char>());
     return str;
+}
+template<typename... Argt>
+std::unordered_map<std::string, std::string> loadmulttext(Argt... Arguments)
+{
+    std::unordered_map<std::string, std::string> ret;
+    auto multf = [&](std::string in)
+    {
+        std::ifstream t(in);
+        std::string str;
+
+        t.seekg(0, std::ios::end);   
+        str.reserve(t.tellg());
+        t.seekg(0, std::ios::beg);
+
+        str.assign((std::istreambuf_iterator<char>(t)),
+                    std::istreambuf_iterator<char>());
+        ret[in] = str;
+    };
+    (multf(std::forward<Argt>(Arguments)), ...);
+    return ret;
 }
 void checkShader(unsigned shader)
 {
@@ -80,10 +102,11 @@ int main(int argc, char **argv)
     glEnable(GL_DEPTH_TEST);
     // Randomized data
     
-    glm::vec2 positon[num_boids];
+    glm::vec4 positon[num_boids];
     glm::vec2 velocity[num_boids];
     {
         std::default_random_engine generator;
+        generator.seed(time(NULL));
         std::uniform_real_distribution<float> x(-50.0,50.0);
         std::uniform_real_distribution<float> y(-50.0,50.0);
         std::uniform_real_distribution<float> v(0.001,0.3);
@@ -92,8 +115,8 @@ int main(int argc, char **argv)
             positon[i].x = x(generator);
             positon[i].y = y(generator);
             
-            velocity[i].x = v(generator);
-            velocity[i].y = v(generator);
+            positon[i].z = v(generator);
+            positon[i].w = v(generator);
         }
     }
 
@@ -106,12 +129,12 @@ int main(int argc, char **argv)
     glBindVertexArray(vao);
 
     //Velocities
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, velocities);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec2) * num_boids, velocity, GL_DYNAMIC_DRAW);
+    //glBindBuffer(GL_SHADER_STORAGE_BUFFER, velocities);
+    //glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec2) * num_boids, velocity, GL_DYNAMIC_DRAW);
     
     //Position buffer / VBO
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, positions);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec2) * num_boids, positon, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec4) * num_boids, positon, GL_DYNAMIC_DRAW);
     
     glBindBuffer(GL_ARRAY_BUFFER, positions);
 
@@ -119,34 +142,30 @@ int main(int argc, char **argv)
     unsigned renderprogram,computeprogram;
     unsigned vs, fs, gs, cs;
     {
-
-        auto vert_text = loadtext("vert.glsl");
-        auto frag_text = loadtext("frag.glsl");
-        auto gs_text = loadtext("geom.glsl");
-        auto comp_text = loadtext("compute.comp");
-        auto rule1_text = loadtext("rule1.comp");
-        auto rule2_text = loadtext("rule2.comp");
-        auto rule3_text = loadtext("rule3.comp");
+        auto loaded = loadmulttext("vert.glsl", "frag.glsl", 
+            "geom.glsl", "compute.comp", "rule1.comp", "rule2.comp",
+            "rule3.comp");
+        std::cout << "Map-size: " << loaded.size() << std::endl;
         vs = glCreateShader(GL_VERTEX_SHADER);
-        const char *src = vert_text.c_str();
+        const char *src = loaded["vert.glsl"].c_str();
         glShaderSource(vs, 1, &src, NULL);
         std::cout << "OpenGL >> Compiling Vertex shader.." << std::endl;
         glCompileShader(vs);
         checkShader(vs);
         fs = glCreateShader(GL_FRAGMENT_SHADER);
-        src = frag_text.c_str();
+        src = loaded["frag.glsl"].c_str();
         glShaderSource(fs, 1, &src, NULL);
         std::cout << "OpenGL >> Compiling Fragment shader.." << std::endl;
         glCompileShader(fs);
         checkShader(fs);
         gs = glCreateShader(GL_GEOMETRY_SHADER);
-        src = gs_text.c_str();
+        src = loaded["geom.glsl"].c_str();
         glShaderSource(gs, 1, &src, NULL);
         std::cout << "OpenGL >> Compiling Geometry shader" << std::endl;
         glCompileShader(gs);
         checkShader(gs);
         cs = glCreateShader(GL_COMPUTE_SHADER);
-        src = comp_text.c_str();
+        src = loaded["compute.comp"].c_str();
         glShaderSource(cs, 1, &src, NULL);
         std::cout << "OpenGL >> Compiling compute shader.." << std::endl;
         glCompileShader(cs);
@@ -166,7 +185,7 @@ int main(int argc, char **argv)
         std::cout << "OpenGL >> Linking Renderprogram" << std::endl;
         link(renderprogram);
         posAttrib = glGetAttribLocation(renderprogram, "position");
-        glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        glVertexAttribPointer(posAttrib, 4, GL_FLOAT, GL_FALSE, 0, 0);
         glEnableVertexAttribArray(posAttrib);
         std::cout << "OpenGL >> Linking Compute-shader" << std::endl;
         link(computeprogram);
@@ -190,25 +209,25 @@ int main(int argc, char **argv)
     {
         current = glfwGetTime();
         delta = current - prev;
-        if(delta >= 1.0/32.0)
+        if(delta >= 1.0/30.0)
         {
             
             glUseProgram(computeprogram);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, positions);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, velocities);
+            //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, velocities);
             glDispatchCompute(num_boids, 1, 1);
             glUseProgram(0);
             prev = current;
+            glMemoryBarrier(GL_ALL_BARRIER_BITS);
+            glUseProgram(renderprogram);
+            glUniformMatrix4fv(vlp, 1, GL_FALSE, &vm[0][0]);
+            glUniformMatrix4fv(plp, 1, GL_FALSE, &pm[0][0]);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glDrawArrays(GL_POINTS, 0, num_boids);
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+            glUseProgram(0);
         }
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        glUseProgram(renderprogram);
-        glUniformMatrix4fv(vlp, 1, GL_FALSE, &vm[0][0]);
-        glUniformMatrix4fv(plp, 1, GL_FALSE, &pm[0][0]);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDrawArrays(GL_POINTS, 0, num_boids);
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-        glUseProgram(0);
     }
     glfwTerminate();
     return 0;
