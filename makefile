@@ -12,7 +12,7 @@
   all: $(TARGET)
 
   $(TARGET): $(TARGET).cpp
-	$(CC) $(CFLAGS) -o $(TARGET) $(TARGET).cpp -lglfw3 -lGL -ldl -pthread -lGLEW -lOpenCL
+	$(CC) $(CFLAGS) -o $(TARGET) $(TARGET).cpp -lglfw -lGL -ldl -pthread -lGLEW -lOpenCL
 
   clean:
 	$(RM) $(TARGET)

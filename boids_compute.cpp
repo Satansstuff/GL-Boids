@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     bool is_open = true;
     
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
@@ -129,8 +129,8 @@ int main(int argc, char **argv)
     glBindVertexArray(vao);
 
     //Velocities
-    //glBindBuffer(GL_SHADER_STORAGE_BUFFER, velocities);
-    //glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec2) * num_boids, velocity, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, velocities);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec2) * num_boids, velocity, GL_DYNAMIC_DRAW);
     
     //Position buffer / VBO
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, positions);
@@ -143,8 +143,7 @@ int main(int argc, char **argv)
     unsigned vs, fs, gs, cs;
     {
         auto loaded = loadmulttext("vert.glsl", "frag.glsl", 
-            "geom.glsl", "compute.comp", "rule1.comp", "rule2.comp",
-            "rule3.comp");
+            "geom.glsl", "compute.comp");
         std::cout << "Map-size: " << loaded.size() << std::endl;
         vs = glCreateShader(GL_VERTEX_SHADER);
         const char *src = loaded["vert.glsl"].c_str();
@@ -214,7 +213,7 @@ int main(int argc, char **argv)
             
             glUseProgram(computeprogram);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, positions);
-            //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, velocities);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, velocities);
             glDispatchCompute(num_boids, 1, 1);
             glUseProgram(0);
             prev = current;
