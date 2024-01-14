@@ -99,7 +99,7 @@ int main(int argc, char **argv)
         glfwTerminate();
         return -1;
     }
-    glViewport(0, 0, 800, 600);
+    glViewport(0, 0, mode->width, mode->height);
     glEnable(GL_PROGRAM_POINT_SIZE);
     glEnable(GL_DEPTH_TEST);
     // Randomized data
